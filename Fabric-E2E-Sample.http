@@ -1,0 +1,210 @@
+@fabricBaseUrl = https://api.fabric.microsoft.com/v1
+@pbiBaseUrl = https://api.powerbi.com/v1.0/myorg
+
+# 0 List Capacities
+# 1 Create workspace & Assign capacity
+# 2 Connect Git
+# 3 Sync Git
+# 4 Refresh Dataset
+# 5 Update report (browser)
+# 6 Commit Git
+
+#######################
+# Fill in params here #
+#######################
+
+@workspaceName = API Demo 2
+@gitOrgName = pbi-tools
+@gitProjectName = Fabric-Demo
+@gitRepoName = Fabric-Demo
+@gitBranchName = main
+@gitFolder = /
+
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/capacities/list-capacities
+# @name ListCapacities
+GET {{fabricBaseUrl}}/capacities
+Authorization: Bearer {{$aadV2Token new scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# This selects a 'FT1' (Fabric Trial) capacity to authenticated user has acess to:
+@capacityId = {{ListCapacities.response.body.value[?(@.sku == 'FT1')].id}}
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/workspaces/create-workspace
+# @name CreateWorkspace
+
+POST {{fabricBaseUrl}}/workspaces
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+Content-Type: application/json
+
+{
+    "displayName": "{{workspaceName}}",
+    "capacityId": "{{capacityId}}",
+    "description": "Tool Talk Fabric API Demo"
+}
+
+####
+
+@workspaceId = {{CreateWorkspace.response.body.id}}
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/workspaces/get-workspace
+# @name GetWorkspace
+GET {{fabricBaseUrl}}/workspaces/{{workspaceId}}
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/git/commit-to-git
+# @name ConnectGit
+
+POST {{fabricBaseUrl}}/workspaces/{{workspaceId}}/git/connect
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+Content-Type: application/json
+
+{
+  "gitProviderDetails": {
+    "organizationName": "{{gitOrgName}}",
+    "projectName": "{{gitProjectName}}",
+    "gitProviderType": "AzureDevops",
+    "repositoryName": "{{gitRepoName}}",
+    "branchName": "{{gitBranchName}}",
+    "directoryName": "{{gitFolder}}"
+  }
+}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/git/get-connection
+# @name GetGitConnection
+GET {{fabricBaseUrl}}/workspaces/{{workspaceId}}/git/connection
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/git/initialize-connection
+# @name InitGitConnection
+POST {{fabricBaseUrl}}/workspaces/{{workspaceId}}/git/initializeConnection
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+Content-Type: application/json
+
+{
+    "initializationStrategy": "None"
+}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/git/update-from-git
+# @name UpdateFromGit
+POST {{fabricBaseUrl}}/workspaces/{{workspaceId}}/git/updateFromGit
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+Content-Type: application/json
+
+{
+    "remoteCommitHash": "{{InitGitConnection.response.body.remoteCommitHash}}",
+    "conflictResolution": {
+      "conflictResolutionType": "Workspace",
+      "conflictResolutionPolicy": "PreferWorkspace"
+    },
+    "options": {
+      "allowOverrideItems": true
+    }
+}
+
+####
+
+# @name UpdateFromGitStatus
+GET {{UpdateFromGit.response.headers.Location}}
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/items/list-items
+# @name ListItems
+GET {{fabricBaseUrl}}/workspaces/{{workspaceId}}/items
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+@datasetId = {{ListItems.response.body.value[?(@.type == 'SemanticModel')].id}}
+@reportId = {{ListItems.response.body.value[?(@.type == 'Report')].id}}
+
+# https://learn.microsoft.com/en-gb/rest/api/power-bi/datasets/get-refresh-history-in-group
+# @name GetDatasetRefreshes
+GET {{pbiBaseUrl}}/groups/{{workspaceId}}/datasets/{{datasetId}}/refreshes
+Authorization: Bearer {{$aadV2Token scopes:https://analysis.windows.net/powerbi/api/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+
+####
+
+# https://learn.microsoft.com/en-gb/rest/api/power-bi/datasets/refresh-dataset-in-group
+# @name RefreshDataset
+POST {{pbiBaseUrl}}/groups/{{workspaceId}}/datasets/{{datasetId}}/refreshes
+Authorization: Bearer {{$aadV2Token scopes:https://analysis.windows.net/powerbi/api/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+Content-Type: application/json
+
+{
+    "type": "Full",
+    "commitMode": "transactional"
+}
+
+####
+
+# @name GetRefreshStatus
+GET {{RefreshDataset.response.headers.Location}}
+Authorization: Bearer {{$aadV2Token scopes:https://analysis.windows.net/powerbi/api/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/git/get-status
+# @name GetGitStatus
+GET {{fabricBaseUrl}}/workspaces/{{workspaceId}}/git/status
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# https://learn.microsoft.com/en-us/rest/api/fabric/core/git/commit-to-git
+# @name CommitToGit
+POST {{fabricBaseUrl}}/workspaces/{{workspaceId}}/git/commitToGit
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+Content-Type: application/json
+
+{
+  "mode": "All",
+  "workspaceHead": "{{GetGitStatus.response.body.workspaceHead}}",
+  "comment": "Committed via API"
+}
+
+####
+
+# @name CommitToGitStatus
+GET {{CommitToGit.response.headers.Location}}
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# @name GetItemDefinitionReport
+POST {{fabricBaseUrl}}/workspaces/{{workspaceId}}/items/{{reportId}}/getDefinition
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# @name GetItemDefinitionModel
+POST {{fabricBaseUrl}}/workspaces/{{workspaceId}}/items/{{datasetId}}/getDefinition
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+# @name GetLROResponseStatus
+GET {{GetItemDefinitionModel.response.headers.Location}}
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
+GET {{GetLROResponseStatus.response.headers.Location}}
+Authorization: Bearer {{$aadV2Token scopes:https://api.fabric.microsoft.com/.default clientId:7f67af8a-fedc-4b08-8b4e-37c4d127b6cf}}
+
+####
+
