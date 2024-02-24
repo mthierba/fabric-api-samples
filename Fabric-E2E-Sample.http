@@ -43,7 +43,7 @@ Content-Type: application/json
 {
     "displayName": "{{workspaceName}}",
     "capacityId": "{{capacityId}}",
-    "description": "Tool Talk Fabric API Demo"
+    "description": "Fabric API Demo"
 }
 
 ####
@@ -68,7 +68,7 @@ Content-Type: application/json
   "gitProviderDetails": {
     "organizationName": "{{gitOrgName}}",
     "projectName": "{{gitProjectName}}",
-    "gitProviderType": "AzureDevops",
+    "gitProviderType": "AzureDevOps",
     "repositoryName": "{{gitRepoName}}",
     "branchName": "{{gitBranchName}}",
     "directoryName": "{{gitFolder}}"
